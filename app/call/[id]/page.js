@@ -1,35 +1,28 @@
 "use client";
-import React from "react";
+import React, { useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import CallRoom from "@/app/components/CallRoom";
 
-export default function CallPage({ params }) {
+export default function CallPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const params = useParams(); // ✅ correct way to get route params
+  const callId = params?.id;
 
-  // Unwrap params using React.use()
-  const unwrappedParams = React.use(params);
-  const roomId = unwrappedParams.id;
-
-  React.useEffect(() => {
-    if (!user) router.push("/login");
+  // Redirect if user not logged in
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+    }
   }, [user, router]);
 
-  if (!user) return null;
+  if (!user || !callId) return null;
 
   return (
-    <CallRoom
-      roomId={roomId}
-      onCallEnd={() => {
-        if (user.role === "doctor") {
-          const searchParams = new URLSearchParams(window.location.search);
-          const patientId = searchParams.get("patientId");
-          router.push(`/doctor/prescription?patientId=${patientId}&doctorId=${user.uid}`);
-        } else {
-          router.push("/dashboard");
-        }
-      }}
-    />
+    <div className="flex flex-col h-screen">
+      {/* CallRoom now handles video + chat */}
+      <CallRoom callId={callId} user={user} />
+    </div>
   );
 }

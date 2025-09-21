@@ -3,30 +3,53 @@
 import { useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
 import Peer from "simple-peer";
-import { useAuth } from "@/app/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FiMic, FiMicOff, FiVideo, FiVideoOff, FiPhoneOff, FiMessageSquare } from "react-icons/fi";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "@/app/firebaseConfig";
+import {
+  FiMic,
+  FiMicOff,
+  FiVideo,
+  FiVideoOff,
+  FiPhoneOff,
+  FiMessageSquare,
+} from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+const SOCKET_SERVER_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
 
-export default function CallRoom({ roomId }) {
-  const { user } = useAuth();
+export default function CallRoom({ callId, user }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const patientIdParam = searchParams.get("patientId"); // patient from URL
+  const patientIdParam = searchParams.get("patientId");
+
+  // Video refs
   const localVideoRef = useRef(null);
   const socketRef = useRef(null);
   const peersRef = useRef({});
   const [stream, setStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
+
+  // Controls
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+
+  // Chat
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
+  const bottomRef = useRef(null);
 
+  // --- VIDEO CALL SETUP ---
   useEffect(() => {
     if (!user) return;
 
@@ -35,23 +58,39 @@ export default function CallRoom({ roomId }) {
 
     const initMedia = async () => {
       try {
-        const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
         setStream(localStream);
-        if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
+        if (localVideoRef.current)
+          localVideoRef.current.srcObject = localStream;
 
         // Join room
-        socket.emit("join-room", { roomId, userId: user.uid, name: user.displayName });
+        socket.emit("join-room", {
+          roomId: callId,
+          userId: user.uid,
+          name: user.displayName,
+        });
 
         socket.on("user-connected", ({ id }) => {
           if (peersRef.current[id]) return;
-          const peer = new Peer({ initiator: true, trickle: false, stream: localStream });
+          const peer = new Peer({
+            initiator: true,
+            trickle: false,
+            stream: localStream,
+          });
           setupPeer(peer, id);
           peersRef.current[id] = peer;
         });
 
         socket.on("signal", ({ signal, from }) => {
           if (!peersRef.current[from]) {
-            const peer = new Peer({ initiator: false, trickle: false, stream: localStream });
+            const peer = new Peer({
+              initiator: false,
+              trickle: false,
+              stream: localStream,
+            });
             setupPeer(peer, from);
             peersRef.current[from] = peer;
             peer.signal(signal);
@@ -59,8 +98,6 @@ export default function CallRoom({ roomId }) {
             peersRef.current[from].signal(signal);
           }
         });
-
-        socket.on("chat-message", (msg) => setMessages((prev) => [...prev, msg]));
 
         socket.on("user-disconnected", (id) => {
           if (peersRef.current[id]) {
@@ -78,22 +115,56 @@ export default function CallRoom({ roomId }) {
     initMedia();
 
     return () => {
-      // Stop all local media
       if (localVideoRef.current?.srcObject) {
-        localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+        localVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       }
       Object.values(peersRef.current).forEach((peer) => peer.destroy());
       socket.disconnect();
     };
-  }, [user?.uid, roomId]);
+  }, [user?.uid, callId]);
 
   const setupPeer = (peer, peerId) => {
     peer.on("signal", (signal) => {
-      socketRef.current.emit("signal", { signal, from: socketRef.current.id, to: peerId });
+      socketRef.current.emit("signal", {
+        signal,
+        from: socketRef.current.id,
+        to: peerId,
+      });
     });
     peer.on("stream", (remoteStream) => setRemoteStream(remoteStream));
   };
 
+  // --- FIRESTORE CHAT ---
+  useEffect(() => {
+    if (!callId) return;
+
+    const messagesRef = collection(db, "calls", callId, "messages");
+    const q = query(messagesRef, orderBy("createdAt", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setMessages(msgs);
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    return () => unsubscribe();
+  }, [callId]);
+
+  const sendMessage = async () => {
+    if (!messageInput.trim()) return;
+    const messagesRef = collection(db, "calls", callId, "messages");
+
+    await addDoc(messagesRef, {
+      text: messageInput,
+      senderId: user.uid,
+      senderName: user.displayName || "Anonymous",
+      createdAt: serverTimestamp(),
+    });
+
+    setMessageInput("");
+  };
+
+  // --- Controls ---
   const toggleMute = () => {
     stream.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
     setMuted(!muted);
@@ -105,38 +176,27 @@ export default function CallRoom({ roomId }) {
   };
 
   const endCall = () => {
-    // Stop local media
     if (localVideoRef.current?.srcObject) {
-      localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      localVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       localVideoRef.current.srcObject = null;
     }
-
     Object.values(peersRef.current).forEach((peer) => peer.destroy());
     peersRef.current = {};
     setRemoteStream(null);
     setStream(null);
     toast.success("Call ended");
 
-    // Auto redirect based on role
     if (user.role === "doctor") {
-      // Redirect doctor to prescription page
       if (patientIdParam) {
-        router.push(`/doctor/prescription?patientId=${patientIdParam}&doctorId=${user.uid}`);
+        router.push(
+          `/doctor/prescription?patientId=${patientIdParam}&doctorId=${user.uid}`
+        );
       } else {
         router.push("/dashboard");
       }
     } else {
-      // Redirect patient to dashboard
       router.push("/dashboard");
     }
-  };
-
-  const sendMessage = () => {
-    if (!messageInput.trim()) return;
-    const msg = { sender: user.displayName, text: messageInput };
-    socketRef.current.emit("chat-message", msg);
-    setMessages((prev) => [...prev, msg]);
-    setMessageInput("");
   };
 
   return (
@@ -164,9 +224,14 @@ export default function CallRoom({ roomId }) {
           className="absolute bottom-5 right-5 w-32 h-24 md:w-48 md:h-36 object-cover rounded-lg border-2 border-white shadow-lg"
         />
 
+        {/* Toolbar */}
         <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 flex space-x-4 z-50">
-          <ToolbarButton onClick={toggleMute}>{muted ? <FiMicOff /> : <FiMic />}</ToolbarButton>
-          <ToolbarButton onClick={toggleCamera}>{cameraOff ? <FiVideoOff /> : <FiVideo />}</ToolbarButton>
+          <ToolbarButton onClick={toggleMute}>
+            {muted ? <FiMicOff /> : <FiMic />}
+          </ToolbarButton>
+          <ToolbarButton onClick={toggleCamera}>
+            {cameraOff ? <FiVideoOff /> : <FiVideo />}
+          </ToolbarButton>
           <ToolbarButton onClick={() => setChatOpen(!chatOpen)}>
             <FiMessageSquare />
           </ToolbarButton>
@@ -187,12 +252,20 @@ export default function CallRoom({ roomId }) {
           >
             <h2 className="font-semibold text-lg mb-2">Chat</h2>
             <div className="flex-1 flex flex-col justify-end gap-1 overflow-y-auto no-scrollbar">
-              {messages.map((m, i) => (
-                <div key={i}>
-                  <span className="font-semibold text-teal-600">{m.sender}: </span>
-                  <span>{m.text}</span>
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`p-2 rounded-xl max-w-[70%] ${
+                    m.senderId === user.uid
+                      ? "bg-blue-500 text-white self-end ml-auto"
+                      : "bg-gray-200 text-black self-start mr-auto"
+                  }`}
+                >
+                  <p className="text-sm font-medium">{m.senderName}</p>
+                  <p>{m.text}</p>
                 </div>
               ))}
+              <div ref={bottomRef} />
             </div>
             <div className="flex mt-2 gap-2">
               <input
