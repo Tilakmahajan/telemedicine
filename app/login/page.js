@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { auth } from "@/app/lib/firebase";
+import { auth, db } from "@/app/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
@@ -16,9 +17,19 @@ export default function Login() {
     e.preventDefault();
     const loadingToast = toast.loading("Logging in...");
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+      // fetch role
+      const snap = await getDoc(doc(db, "users", userCredential.user.uid));
+      const role = snap.exists() ? snap.data().role : "patient";
+
       toast.success("Logged in successfully!", { id: loadingToast });
-      router.push("/dashboard");
+
+      if (role === "doctor") {
+        router.push("/doctor/dashboard");
+      } else {
+        router.push("/patient/dashboard");
+      }
     } catch (err) {
       toast.error(err.message, { id: loadingToast });
     }
@@ -26,7 +37,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      {/* Animated background subtle circles */}
       <motion.div
         className="absolute -top-40 -left-40 w-96 h-96 bg-teal-300/20 rounded-full"
         animate={{ y: [0, 15, 0] }}

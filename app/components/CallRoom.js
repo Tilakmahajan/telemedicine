@@ -15,7 +15,7 @@ export default function CallRoom({ roomId }) {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const patientId = searchParams.get("patientId"); // patient from URL
+  const patientIdParam = searchParams.get("patientId"); // patient from URL
   const localVideoRef = useRef(null);
   const socketRef = useRef(null);
   const peersRef = useRef({});
@@ -39,6 +39,7 @@ export default function CallRoom({ roomId }) {
         setStream(localStream);
         if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
 
+        // Join room
         socket.emit("join-room", { roomId, userId: user.uid, name: user.displayName });
 
         socket.on("user-connected", ({ id }) => {
@@ -77,11 +78,10 @@ export default function CallRoom({ roomId }) {
     initMedia();
 
     return () => {
-      // Stop all local media tracks
+      // Stop all local media
       if (localVideoRef.current?.srcObject) {
         localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       }
-      // Destroy all peers
       Object.values(peersRef.current).forEach((peer) => peer.destroy());
       socket.disconnect();
     };
@@ -105,23 +105,28 @@ export default function CallRoom({ roomId }) {
   };
 
   const endCall = () => {
-    // Stop local media completely
+    // Stop local media
     if (localVideoRef.current?.srcObject) {
       localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       localVideoRef.current.srcObject = null;
     }
 
-    // Destroy all peers
     Object.values(peersRef.current).forEach((peer) => peer.destroy());
     peersRef.current = {};
     setRemoteStream(null);
     setStream(null);
     toast.success("Call ended");
 
-    // Redirect doctor to prescription page for ONLY this patient
-    if (user.role === "doctor" && patientId) {
-      router.push(`/doctor/prescription?patientId=${patientId}&doctorId=${user.uid}`);
+    // Auto redirect based on role
+    if (user.role === "doctor") {
+      // Redirect doctor to prescription page
+      if (patientIdParam) {
+        router.push(`/doctor/prescription?patientId=${patientIdParam}&doctorId=${user.uid}`);
+      } else {
+        router.push("/dashboard");
+      }
     } else {
+      // Redirect patient to dashboard
       router.push("/dashboard");
     }
   };

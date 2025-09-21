@@ -1,34 +1,35 @@
 "use client";
-
-import React, { useEffect } from "react";
+import React from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
 import CallRoom from "@/app/components/CallRoom";
 
-export default function CallPage(props) {
+export default function CallPage({ params }) {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Unwrap params (Next.js 15+ App Router)
-  const params = React.use(props.params);
-  const roomId = params.id;
+  // Unwrap params using React.use()
+  const unwrappedParams = React.use(params);
+  const roomId = unwrappedParams.id;
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!user) {
-      router.push("/login");
-    }
+  React.useEffect(() => {
+    if (!user) router.push("/login");
   }, [user, router]);
 
-  // Handler when call ends
-  const handleCallEnd = () => {
-    router.push("/dashboard");
-  };
+  if (!user) return null;
 
-  if (!user) {
-    // Render null while redirecting
-    return null;
-  }
-
-  return <CallRoom roomId={roomId} onCallEnd={handleCallEnd} />;
+  return (
+    <CallRoom
+      roomId={roomId}
+      onCallEnd={() => {
+        if (user.role === "doctor") {
+          const searchParams = new URLSearchParams(window.location.search);
+          const patientId = searchParams.get("patientId");
+          router.push(`/doctor/prescription?patientId=${patientId}&doctorId=${user.uid}`);
+        } else {
+          router.push("/dashboard");
+        }
+      }}
+    />
+  );
 }

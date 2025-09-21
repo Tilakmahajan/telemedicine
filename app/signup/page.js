@@ -39,7 +39,12 @@ export default function Signup() {
       });
 
       toast.success("Account created!", { id: loadingToast });
-      router.push("/dashboard");
+
+      if (role === "doctor") {
+        router.push("/doctor/dashboard");
+      } else {
+        router.push("/patient/dashboard");
+      }
     } catch (err) {
       toast.error(err.message, { id: loadingToast });
     }
