@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/app/firebaseConfig";
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/app/context/AuthContext";
+import { jsPDF } from "jspdf";
 
 export default function PatientDashboard() {
   const { user } = useAuth();
@@ -13,6 +14,7 @@ export default function PatientDashboard() {
   const [time, setTime] = useState("");
   const [appointments, setAppointments] = useState([]);
   const [activeCalls, setActiveCalls] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
 
   // Fetch doctors
   useEffect(() => {
@@ -46,6 +48,17 @@ export default function PatientDashboard() {
     return () => unsubscribe();
   }, [user]);
 
+  // Fetch prescriptions for this patient
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "prescriptions"), where("patientId", "==", user.uid));
+    const unsubscribe = onSnapshot(q, snapshot => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPrescriptions(data);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const requestAppointment = async () => {
     if (!selectedDoctor || !symptoms || !date || !time) return alert("Please select a doctor and fill all fields.");
     await addDoc(collection(db, "appointments"), {
@@ -61,6 +74,37 @@ export default function PatientDashboard() {
     });
     setSymptoms(""); setDate(""); setTime("");
     alert("Appointment request sent!");
+  };
+
+  // Download prescription as PDF
+  const downloadPrescription = (presc) => {
+    const docPDF = new jsPDF();
+    docPDF.setFontSize(16);
+    docPDF.text("Prescription", 105, 15, { align: "center" });
+    docPDF.setFontSize(12);
+
+    const doctor = presc.doctorName || presc.doctorId || "Unknown Doctor";
+    const patient = presc.patientName || presc.patientId || user.displayName || "Unknown Patient";
+    const appointment = presc.appointmentId || "N/A";
+
+    docPDF.text(`Doctor: ${doctor}`, 20, 30);
+    docPDF.text(`Patient: ${patient}`, 20, 38);
+    docPDF.text(`Appointment ID: ${appointment}`, 20, 46);
+    docPDF.text(`Date: ${presc.date?.toDate ? presc.date.toDate().toLocaleString() : "N/A"}`, 20, 54);
+
+    docPDF.text("Medicines:", 20, 68);
+    (presc.medicines || []).forEach((med, i) => {
+      const lineY = 76 + i * 10;
+      docPDF.text(`${i + 1}. ${med.name} - ${med.dosage} | Instructions: ${med.instructions}`, 25, lineY);
+    });
+
+    if (presc.notes) {
+      const notesY = 76 + (presc.medicines?.length || 0) * 10 + 10;
+      docPDF.text("Notes:", 20, notesY);
+      docPDF.text(presc.notes, 25, notesY + 8);
+    }
+
+    docPDF.save(`Prescription_${appointment}.pdf`);
   };
 
   return (
@@ -152,7 +196,8 @@ export default function PatientDashboard() {
                   {appt.status.toUpperCase()}
                 </span>
               </div>
-              {/* Join Call if there's an active call */}
+
+              {/* Join Call if active */}
               {activeCalls
                 .filter(c => c.appointmentId === appt.id)
                 .map(c => (
@@ -162,6 +207,19 @@ export default function PatientDashboard() {
                     className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
                   >
                     Join Call
+                  </button>
+                ))}
+
+              {/* Download Prescription */}
+              {prescriptions
+                .filter(p => p.appointmentId === appt.id)
+                .map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => downloadPrescription(p)}
+                    className="mt-2 ml-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
+                  >
+                    Download Prescription
                   </button>
                 ))}
             </div>

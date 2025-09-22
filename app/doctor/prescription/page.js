@@ -1,28 +1,46 @@
 "use client";
-// for doctors
+// PrescriptionForm for Doctors after Call ends
 
 import { useState, useEffect } from "react";
 import { db } from "@/app/firebaseConfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function PrescriptionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const doctorId = searchParams.get("doctorId"); // from URL
-  const patientId = searchParams.get("patientId"); // from URL
+  const doctorId = searchParams.get("doctorId"); 
+  const patientId = searchParams.get("patientId"); 
+  const appointmentId = searchParams.get("appointmentId"); 
 
   const [medicines, setMedicines] = useState([{ name: "", dosage: "", instructions: "" }]);
   const [notes, setNotes] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [doctorName, setDoctorName] = useState("");
 
-  // Redirect if either ID is missing
+  // Redirect if IDs missing
   useEffect(() => {
-    if (!doctorId || !patientId) {
-      alert("Doctor ID or Patient ID missing");
+    if (!doctorId || !patientId || !appointmentId) {
+      alert("Doctor ID, Patient ID or Appointment ID missing");
       router.push("/dashboard");
+      return;
     }
-  }, [doctorId, patientId, router]);
+
+    // Fetch patient and doctor names for display
+    const fetchNames = async () => {
+      try {
+        const patientSnap = await getDoc(doc(db, "users", patientId));
+        if (patientSnap.exists()) setPatientName(patientSnap.data().displayName || "Patient");
+
+        const doctorSnap = await getDoc(doc(db, "users", doctorId));
+        if (doctorSnap.exists()) setDoctorName(doctorSnap.data().displayName || "Doctor");
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      }
+    };
+    fetchNames();
+  }, [doctorId, patientId, appointmentId, router]);
 
   const handleMedicineChange = (index, field, value) => {
     const updated = [...medicines];
@@ -38,18 +56,21 @@ export default function PrescriptionForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!doctorId || !patientId) return;
+    if (!doctorId || !patientId || !appointmentId) return;
 
     try {
       await addDoc(collection(db, "prescriptions"), {
         doctorId,
+        doctorName,          // store doctor name
         patientId,
+        patientName,         // store patient name
+        appointmentId,
         medicines,
         notes,
         date: serverTimestamp(),
       });
 
-      alert("Prescription saved for this patient ✅");
+      alert(`Prescription saved for ${patientName} ✅`);
       router.push("/dashboard");
     } catch (err) {
       console.error(err);
@@ -59,7 +80,12 @@ export default function PrescriptionForm() {
 
   return (
     <div className="container mx-auto p-8">
-      <h2 className="text-2xl font-bold mb-6">Create Prescription</h2>
+      <h2 className="text-2xl font-bold mb-4">Create Prescription</h2>
+      <p className="mb-4">
+        <strong>Doctor:</strong> {doctorName} <br />
+        <strong>Patient:</strong> {patientName}
+      </p>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {medicines.map((med, index) => (
           <div key={index} className="p-4 border rounded-lg space-y-2">

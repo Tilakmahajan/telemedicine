@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { db } from "@/app/firebaseConfig";
 import { collection, query, where, onSnapshot, updateDoc, doc, addDoc } from "firebase/firestore";
 import { useAuth } from "@/app/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
+  const router = useRouter();
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
@@ -24,7 +26,6 @@ export default function DoctorDashboard() {
 
   const startCall = async (appt) => {
     try {
-      // Create call document in Firestore
       const callRef = await addDoc(collection(db, "calls"), {
         doctorId: user.uid,
         patientId: appt.patientId,
@@ -32,13 +33,15 @@ export default function DoctorDashboard() {
         active: true,
         startTime: new Date(),
       });
-
-      // Redirect to CallRoom using call document ID
-      window.location.href = `/call/${callRef.id}?patientId=${appt.patientId}`;
+      window.location.href = `/call/${callRef.id}?patientId=${appt.patientId}&appointmentId=${appt.id}`;
     } catch (err) {
       console.error("Failed to start call:", err);
       alert("Failed to start call. Try again.");
     }
+  };
+
+  const goToPrescription = (appt) => {
+    router.push(`/prescription?doctorId=${user.uid}&patientId=${appt.patientId}&appointmentId=${appt.id}`);
   };
 
   return (
@@ -64,7 +67,7 @@ export default function DoctorDashboard() {
                 </span>
               </div>
 
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex gap-2 flex-wrap">
                 {appt.status === "pending" && (
                   <>
                     <button
@@ -82,12 +85,20 @@ export default function DoctorDashboard() {
                   </>
                 )}
                 {appt.status === "approved" && (
-                  <button
-                    onClick={() => startCall(appt)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"
-                  >
-                    Start Call
-                  </button>
+                  <>
+                    <button
+                      onClick={() => startCall(appt)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"
+                    >
+                      Start Call
+                    </button>
+                    <button
+                      onClick={() => goToPrescription(appt)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all shadow-md hover:shadow-lg"
+                    >
+                      Create Prescription
+                    </button>
+                  </>
                 )}
               </div>
             </div>

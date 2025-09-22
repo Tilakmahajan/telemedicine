@@ -30,7 +30,9 @@ const SOCKET_SERVER_URL =
 export default function CallRoom({ callId, user }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const patientIdParam = searchParams.get("patientId");
+  const appointmentIdParam = searchParams.get("appointmentId"); // new param
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -187,9 +189,9 @@ export default function CallRoom({ callId, user }) {
     toast.success("Call ended");
 
     if (user.role === "doctor") {
-      if (patientIdParam) {
+      if (patientIdParam && appointmentIdParam) {
         router.push(
-          `/doctor/prescription?patientId=${patientIdParam}&doctorId=${user.uid}`
+          `/doctor/prescription?patientId=${patientIdParam}&doctorId=${user.uid}&appointmentId=${appointmentIdParam}`
         );
       } else {
         router.push("/dashboard");
