@@ -109,7 +109,7 @@ export default function Login() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.9, duration: 0.6 }}
         >
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <a href="/signup" className="text-teal-500 font-semibold underline">
             Sign Up
           </a>

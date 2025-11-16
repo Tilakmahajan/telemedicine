@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-
+import Image from "next/image";
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,6 +43,17 @@ export default function Home() {
             <a onClick={() => scrollToSection("features")} className="cursor-pointer text-gray-600 hover:text-gray-800 transition">Features</a>
             <a onClick={() => scrollToSection("cta")} className="cursor-pointer text-gray-600 hover:text-gray-800 transition">Get Started</a>
             <a onClick={() => scrollToSection("contact")} className="cursor-pointer text-gray-600 hover:text-gray-800 transition">Contact</a>
+
+            {/* ✅ Health Tracker Link */}
+            <a
+              href="https://health-tracker-plum.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+            >
+              Health Tracker 💚
+            </a>
+
             <button onClick={handleSignIn} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100">Sign In</button>
             <button onClick={handlePatientSignup} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Sign Up</button>
           </div>
@@ -62,6 +73,17 @@ export default function Home() {
             <a onClick={() => scrollToSection("features")} className="block px-4 py-2 border-b border-gray-200 cursor-pointer">Features</a>
             <a onClick={() => scrollToSection("cta")} className="block px-4 py-2 border-b border-gray-200 cursor-pointer">Get Started</a>
             <a onClick={() => scrollToSection("contact")} className="block px-4 py-2 border-b border-gray-200 cursor-pointer">Contact</a>
+            
+            {/* ✅ Health Tracker (Mobile) */}
+            <a
+              href="https://health-tracker-plum.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block px-4 py-2 border-b border-gray-200 text-green-600 font-semibold"
+            >
+              Health Tracker 💚
+            </a>
+
             <button onClick={handleSignIn} className="w-full px-4 py-2 text-gray-600 border-t border-gray-200">Sign In</button>
             <button onClick={handlePatientSignup} className="w-full px-4 py-2 bg-blue-600 text-white hover:bg-blue-700">Sign Up</button>
           </div>
@@ -101,8 +123,14 @@ export default function Home() {
             className="relative"
           >
             <div className="relative overflow-hidden rounded-2xl shadow-lg">
-              <img src="telemedicine.jpg" alt="Telemedicine consultation" className="w-full h-auto rounded-2xl" />
-           
+              <Image
+                src="/telemedicine.jpg"
+                alt="Telemedicine consultation"
+                width={800}
+                height={500}
+                className="w-full h-auto rounded-2xl"
+                priority
+              />
             </div>
           </motion.div>
         </div>
@@ -119,7 +147,7 @@ export default function Home() {
           >
             <h2 className="text-3xl md:text-5xl font-bold mb-6">Why Choose TeleMed?</h2>
             <p className="text-xl text-gray-600">
-              We're revolutionizing healthcare with cutting-edge technology and personalized care that puts you first.
+              We&apos;re revolutionizing healthcare with cutting-edge technology and personalized care that puts you first.
             </p>
           </motion.div>
 
@@ -157,6 +185,16 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button onClick={handlePatientSignup} className="bg-blue-600 text-white px-12 py-4 rounded-md hover:bg-blue-700">Start as Patient ➡️</button>
               <button onClick={handleDoctorSignup} className="border border-blue-600 text-blue-600 px-12 py-4 rounded-md hover:bg-blue-100">Join as Doctor</button>
+
+              {/* ✅ Health Tracker Button */}
+              <a
+                href="https://health-tracker-plum.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-12 py-4 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+              >
+                Open Health Tracker 📊
+              </a>
             </div>
           </motion.div>
         </div>

@@ -32,7 +32,7 @@ export default function CallRoom({ callId, user }) {
   const searchParams = useSearchParams();
 
   const patientIdParam = searchParams.get("patientId");
-  const appointmentIdParam = searchParams.get("appointmentId"); // new param
+  const appointmentIdParam = searchParams.get("appointmentId");
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -58,17 +58,17 @@ export default function CallRoom({ callId, user }) {
     const socket = io(SOCKET_SERVER_URL, { transports: ["websocket"] });
     socketRef.current = socket;
 
+    let localStreamInstance = null;
+
     const initMedia = async () => {
       try {
-        const localStream = await navigator.mediaDevices.getUserMedia({
+        localStreamInstance = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
-        setStream(localStream);
-        if (localVideoRef.current)
-          localVideoRef.current.srcObject = localStream;
+        setStream(localStreamInstance);
+        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamInstance;
 
-        // Join room
         socket.emit("join-room", {
           roomId: callId,
           userId: user.uid,
@@ -80,7 +80,7 @@ export default function CallRoom({ callId, user }) {
           const peer = new Peer({
             initiator: true,
             trickle: false,
-            stream: localStream,
+            stream: localStreamInstance,
           });
           setupPeer(peer, id);
           peersRef.current[id] = peer;
@@ -91,7 +91,7 @@ export default function CallRoom({ callId, user }) {
             const peer = new Peer({
               initiator: false,
               trickle: false,
-              stream: localStream,
+              stream: localStreamInstance,
             });
             setupPeer(peer, from);
             peersRef.current[from] = peer;
@@ -117,13 +117,13 @@ export default function CallRoom({ callId, user }) {
     initMedia();
 
     return () => {
-      if (localVideoRef.current?.srcObject) {
-        localVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
+      if (localStreamInstance) {
+        localStreamInstance.getTracks().forEach((t) => t.stop());
       }
       Object.values(peersRef.current).forEach((peer) => peer.destroy());
       socket.disconnect();
     };
-  }, [user?.uid, callId]);
+  }, [callId, user]);
 
   const setupPeer = (peer, peerId) => {
     peer.on("signal", (signal) => {
@@ -178,9 +178,8 @@ export default function CallRoom({ callId, user }) {
   };
 
   const endCall = () => {
-    if (localVideoRef.current?.srcObject) {
-      localVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
-      localVideoRef.current.srcObject = null;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
     }
     Object.values(peersRef.current).forEach((peer) => peer.destroy());
     peersRef.current = {};
@@ -194,10 +193,10 @@ export default function CallRoom({ callId, user }) {
           `/doctor/prescription?patientId=${patientIdParam}&doctorId=${user.uid}&appointmentId=${appointmentIdParam}`
         );
       } else {
-        router.push("/dashboard");
+        router.push("/doctor/dashboard");
       }
     } else {
-      router.push("/dashboard");
+      router.push("/patient/dashboard");
     }
   };
 
