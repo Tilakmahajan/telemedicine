@@ -208,7 +208,7 @@ export default function Home() {
           </div>
           <span className="text-xl font-bold">TeleMed</span>
         </div>
-        <p className="text-gray-300">© 2024 TeleMed. All rights reserved.</p>
+        <p className="text-gray-300">© 2026 TeleMed. All rights reserved.</p>
       </footer>
     </div>
   );
